@@ -1,0 +1,52 @@
+name: Build and Publish Docker Image
+
+# 触发条件：当你推送到 main 分支，或者手动点击运行按钮时触发
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  # github.repository 会自动获取你的仓库名，即 zzzhhh1/Sing-Flare-Auto
+  IMAGE_NAME: ${{ github.repository }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    
+    # 赋予 Action 推送镜像到 ghcr.io 的权限
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # 这里的 GITHUB_TOKEN 是 GitHub 自动提供的，不需要你手动去设置 Secret！
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # 自动打上 latest 标签，以及每次提交的简短哈希值作为版本号
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
